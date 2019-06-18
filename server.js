@@ -133,10 +133,33 @@ async function checkout(obj, {ISBN}, context, info) {
 
   if (book) {
     getUser(currentUser).checkedOut.push(book.ISBN);
-    return `Checked out ${book.title}`
+    return `Checked out ${book.title}`;
   } else {
-    throw new Error(`Error: no book with ISBN ${ISBN} exists`)
+    throw new Error(`Error: no book with ISBN ${ISBN} exists`);
   }
+}
+
+function updateISAN(obj, { currISAN, newISAN }, context, info) {
+  const query = print(
+    gql`
+      mutation updateISAN($currISAN: Int, $newISAN: Int) {
+        updateISAN(currISAN: $currISAN, newISAN: $newISAN)
+      }
+    `
+  );
+  return fetch('http://localhost:3000/database', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      query,
+      variables: {
+        currISAN,
+        newISAN
+      }
+    })
+  })
+    .then(res => res.json())
+    .then(json => json.data.updateISAN);
 }
 
 const libraryTypes = new Schemata(
@@ -173,7 +196,8 @@ const resolvers = {
     signUp: signUp,
     signIn: signIn,
     signOut: signOut,
-    checkout: checkout
+    checkout: checkout,
+    updateISAN: updateISAN
   }
 };
 

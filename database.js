@@ -70,7 +70,7 @@ const movies = [
     ISAN: 1,
     title: 'Detective Pikachu'
   }
-]
+];
 
 function getBooks() {
   return books.map(function(book) {
@@ -80,8 +80,8 @@ function getBooks() {
       author: authors.filter(function(author) {
         return author.books.includes(book.ISBN)
       })[0]
-    }
-  })
+    };
+  });
 }
 
 function getAuthors() {
@@ -91,8 +91,22 @@ function getAuthors() {
       books: books.filter(function(book) {
         return author.books.includes(book.ISBN)
       })
-    }
-  })
+    };
+  });
+}
+
+function updateISAN(obj, { currISAN, newISAN }, context, info) {
+  const movie = movies.find(function(movie) {
+    return movie.ISAN == currISAN;
+  });
+
+  if (!movie) {
+    throw new Error(`No movie with ISAN ${currISAN} exists`);
+  }
+
+  movie.ISAN = newISAN;
+
+  return `Updated ISAN for ${movie.title} from ${currISAN} to ${newISAN}`;
 }
 
 const queryTypes = new Schemata(
@@ -107,6 +121,9 @@ const queryTypes = new Schemata(
 
 const dataTypes = Schemata.from(
   gql`
+    type Mutation {
+      updateISAN(currISAN: Int, newISAN: Int): String
+    }
     type Book {
       ISBN: Int,
       title: String,
@@ -135,6 +152,9 @@ const resolvers = {
     books: getBooks,
     authors: getAuthors,
     movies: () => movies
+  },
+  Mutation: {
+    updateISAN: updateISAN
   }
 };
 
