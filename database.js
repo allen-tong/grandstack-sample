@@ -1,7 +1,5 @@
-const express = require('express');
-const bodyParser = require('body-parser');
-const { graphqlExpress, graphiqlExpress } = require('apollo-server-express');
-const { makeExecutableSchema } = require('graphql-tools');
+const { ApolloServer, gql } = require('apollo-server-express');
+const { Schemata } = require('ne-schemata');
 
 const books = [
   {
@@ -97,31 +95,40 @@ function getAuthors() {
   })
 }
 
-const typeDefs = `
-  type Query {
-    books: [Book],
-    authors: [Author],
-    movies: [Movie]
-  }
-  type Book {
-    ISBN: Int,
-    title: String,
-    author: Author
-  }
-  type Author {
-    name: Name,
-    books: [Book]
-  }
-  type Name {
-    fullName: String,
-    givenName: String,
-    familyName: String
-  }
-  type Movie {
-    ISAN: Int,
-    title: String
-  }
-`;
+const queryTypes = new Schemata(
+  gql`
+    type Query {
+      books: [Book],
+      authors: [Author],
+      movies: [Movie]
+    }
+  `
+);
+
+const dataTypes = Schemata.from(
+  gql`
+    type Book {
+      ISBN: Int,
+      title: String,
+      author: Author
+    }
+    type Author {
+      name: Name,
+      books: [Book]
+    }
+    type Name {
+      fullName: String,
+      givenName: String,
+      familyName: String
+    }
+    type Movie {
+      ISAN: Int,
+      title: String
+    }
+  `
+);
+
+const typeDefs = queryTypes.mergeSDL(dataTypes).typeDefs;
 
 const resolvers = {
   Query: {
@@ -131,13 +138,9 @@ const resolvers = {
   }
 };
 
-const schema = makeExecutableSchema({
+const database = new ApolloServer({
   typeDefs,
-  resolvers,
+  resolvers
 });
 
-const app = express();
-app.use('/database', bodyParser.json(), graphqlExpress({ schema }));
-app.use('/dbgiql', graphiqlExpress({ endpointURL: '/database' }));
-
-module.exports = app
+module.exports = { database, dataTypes };

@@ -1,9 +1,9 @@
+const { ApolloServer, gql } = require('apollo-server-express');
 const express = require('express');
-const bodyParser = require('body-parser');
-const { graphqlExpress, graphiqlExpress } = require('apollo-server-express');
-const { makeExecutableSchema } = require('graphql-tools');
-const database = require('./database.js')
-require('isomorphic-fetch')
+const { print } = require('graphql');
+require('isomorphic-fetch');
+const { Schemata } = require('ne-schemata');
+const { database, dataTypes } = require('./database.js');
 
 // Cache
 var books;
@@ -99,15 +99,20 @@ function signOut() {
 }
 
 function getBooks() {
+  const query = print(
+    gql`
+      query getBooks {
+        books {
+          ISBN
+          title
+        }
+      }
+    `
+  );
   return fetch('http://localhost:3000/database', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query: `{
-      books {
-        ISBN
-        title
-      }
-    }`})
+    body: JSON.stringify({ query })
   })
     .then(res => res.json())
     .then(json => json.data.books);
@@ -134,45 +139,31 @@ async function checkout(obj, {ISBN}, context, info) {
   }
 }
 
-const typeDefs = `
-  type Query {
-    user: UserInfo
-  }
-  type Mutation {
-    signUp(username: String, password: String): UserInfo,
-    signIn(username: String, password: String): UserInfo,
-    signOut: String,
-    checkout(ISBN: Int): String
-  }
-  type Book {
-    ISBN: Int,
-    title: String,
-    author: Author
-  }
-  type Author {
-    name: Name,
-    books: [Book]
-  }
-  type Name {
-    fullName: String,
-    givenName: String,
-    familyName: String
-  }
-  type Movie {
-    ISAN: Int,
-    title: String
-  }
-  type User {
-    id: Int,
-    username: String,
-    password: String,
-    checkedOut: [Int]
-  }
-  type UserInfo {
-    username: String,
-    checkedOut: [String]
-  }
-`;
+const libraryTypes = new Schemata(
+  gql`
+    type Query {
+      user: UserInfo
+    }
+    type Mutation {
+      signUp(username: String, password: String): UserInfo,
+      signIn(username: String, password: String): UserInfo,
+      signOut: String,
+      checkout(ISBN: Int): String
+    }
+    type User {
+      id: Int,
+      username: String,
+      password: String,
+      checkedOut: [Int]
+    }
+    type UserInfo {
+      username: String,
+      checkedOut: [String]
+    }
+  `
+);
+
+const typeDefs = libraryTypes.mergeSDL(dataTypes).typeDefs;
 
 const resolvers = {
   Query: {
@@ -186,16 +177,14 @@ const resolvers = {
   }
 };
 
-const schema = makeExecutableSchema({
-  typeDefs,
-  resolvers,
-});
-
 const app = express();
-app.use('/graphql', bodyParser.json(), graphqlExpress({ schema }));
-app.use('/graphiql', graphiqlExpress({ endpointURL: '/graphql' }));
-app.use('/', database)
+const schema = new ApolloServer({
+  typeDefs,
+  resolvers
+});
+schema.applyMiddleware({ app, path: '/graphql' });
+database.applyMiddleware({ app, path: '/database' });
 
 app.listen(3000, () => {
-  console.log('Go to http://localhost:3000/graphiql to run queries!');
+  console.log('Go to http://localhost:3000/graphql to run queries!');
 });
