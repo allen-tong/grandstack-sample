@@ -19,6 +19,9 @@ const sharedTypes = new Schemata(
       ISAN: ID,
       title: String
     }
+    type Director {
+      name: String
+    }
   `
 );
 
@@ -47,6 +50,15 @@ const localTypes = new Schemata(
           RETURN exists(()-[rel]->())
           """
         ),
+      RelateDirectorToMovie(directorName: String, movieISAN: ID): Boolean
+        @cypher(statement:
+          """
+          MATCH (director:Director {name: $directorName})
+          MATCH (movie:Movie {ISAN: $movieISAN})
+          MERGE (director)-[rel:DIRECTED]->(movie)
+          RETURN exists(()-[rel]->())
+          """
+        ),
       Checkout(username: String, ISBN: ID): Boolean
         @cypher(statement:
           """
@@ -72,6 +84,16 @@ const localTypes = new Schemata(
       books: [Book]
         @relation(name: "WROTE", direction: "OUT")
         @cypher(statement: "MATCH (this)-[:WROTE]->(b:Book) RETURN b")
+    }
+    type Movie {
+      director: Director
+        @relation(name: "DIRECTED", direction: "IN")
+        @cypher(statement: "MATCH (d:Director)-[:DIRECTED]->(this) RETURN d")
+    }
+    type Director {
+      movies: [Movie]
+        @relation(name: "DIRECTED", direction: "IN")
+        @cypher(statement: "MATCH (this)-[:DIRECTED]->(m:Movie) RETURN m")
     }
   `
 );

@@ -15,6 +15,9 @@ const query = print(
       ISAN
       title
     }
+    fragment DirectorFragment on Director {
+      name
+    }
     mutation SeedDatabase {
       u1: CreateUser(
         username: "Guest"
@@ -71,25 +74,34 @@ const query = print(
       ) {
         ...MovieFragment
       }
-      r1: RelateAuthorToBook(
+      d1: CreateDirector(
+        name: "Rob Letterman"
+      ) {
+        ...DirectorFragment
+      }
+      br1: RelateAuthorToBook(
         authorName: "J.K. Rowling",
         bookISBN: 1,
         year: 1997
       )
-      r2: RelateAuthorToBook(
+      br2: RelateAuthorToBook(
         authorName: "Michael Crichton",
         bookISBN: 2,
         year: 1990
       )
-      r3: RelateAuthorToBook(
+      br3: RelateAuthorToBook(
         authorName: "Christopher Paolini",
         bookISBN: 3,
         year: 2002
       )
-      r4: RelateAuthorToBook(
+      br4: RelateAuthorToBook(
         authorName: "Arthur Conan Doyle",
         bookISBN: 4,
         year: 1902
+      )
+      mr1: RelateDirectorToMovie(
+        directorName: "Rob Letterman",
+        movieISAN: 1
       )
     }
   `

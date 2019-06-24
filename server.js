@@ -181,6 +181,12 @@ const localTypes = new Schemata(
     type Author {
       books: [Book]
     }
+    type Movie {
+      director: Director
+    }
+    type Director {
+      movies: [Movie]
+    }
   `
 );
 
