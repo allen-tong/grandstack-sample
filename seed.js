@@ -16,6 +16,11 @@ const query = print(
       title
     }
     mutation SeedDatabase {
+      u1: CreateUser(
+        username: "Guest"
+      ) {
+        username
+      }
       b1: CreateBook(
         ISBN: 1,
         title: "Harry Potter and the Sorcerer's Stone"

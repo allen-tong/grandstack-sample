@@ -5,33 +5,43 @@ require('isomorphic-fetch');
 const { Schemata } = require('ne-schemata');
 const { database, sharedTypes } = require('./database.js');
 
-// Cache
-var books;
+// State
+var currentUser = 'Guest';
 
-var users = [
-  {
-    id: 0,
-    username: 'Guest',
-    password: null,
-    checkedOut: []
-  }
-];
-
-var currentUser = 0;
-
-function getUser(id) {
-  return users[id];
+function fetchQuery(queryObj, queryName) {
+  return fetch('http://localhost:3000/database', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(queryObj)
+  })
+    .then(res => res.json())
+    .then(json => json.data[queryName]);
 }
 
-function getUserInfo(id) {
-  const user = getUser(id);
+function getUser(username) {
+  const query = print(
+    gql`
+      query GetUser($username: String) {
+        user(username: $username) {
+          username
+          password
+          checkedOut {
+            ISBN
+            title
+          }
+        }
+      }
+    `
+  );
+  const variables = { username };
+  return fetchQuery({ query, variables }, 'user');
+}
+
+async function getUserInfo() {
+  const user = await getUser(currentUser);
   return {
     username: user.username,
-    checkedOut: user.checkedOut.map(function(ISBN) {
-      return books.find(function(book) {
-        return book.ISBN == ISBN;
-      }).title;
-    })
+    checkedOut: user.checkedOut
   };
 }
 
@@ -47,121 +57,123 @@ function fakeSHA256(input) {
   );
 }
 
-function signUp(obj, { username, password }, context, info) {
-  if (currentUser != 0) {
+async function signUp(obj, { username, password }, context, info) {
+  if (currentUser != 'Guest') {
     throw new Error('Error: cannot sign up while signed in');
   }
 
-  const existingUser = users.find(function(user) {
-    return user.username == username;
-  });
+  const existingUser = await getUser(username);
   if (existingUser) {
     throw new Error('Error: user with that username already exists');
   }
 
-  const id = users.length;
-  users.push({
-    id: id,
-    username: username,
-    password: fakeSHA256(password + id),
-    checkedOut: []
-  });
+  const query = print(
+    gql`
+      mutation CreateUser($username: String, $password: String) {
+        CreateUser(username: $username, password: $password) {
+          username
+        }
+      }
+    `
+  );
+  const variables = {
+    username,
+    password: fakeSHA256(username + password)
+  };
+  const newUser = await fetchQuery({ query, variables }, 'CreateUser');
 
-  return getUserInfo(id);
+  return newUser ? 'User successfully signed up' : 'Error: sign-up failed'
 }
 
-function signIn(obj, { username, password }, context, info) {
-  if (currentUser != 0) {
+async function signIn(obj, { username, password }, context, info) {
+  if (currentUser != 'Guest') {
     throw new Error('Error: a user is already signed in');
   }
 
-  const user = users.find(function(user) {
-    return user.username == username &&
-      user.password == fakeSHA256(password + user.id);
-  });
-
-  if (!user) {
+  const user = await getUser(username);
+  if (!user || user.password != fakeSHA256(username + password)) {
     throw new Error(
       'Error: no user with that combination of username and password exists'
     );
   }
 
-  currentUser = user.id;
+  currentUser = username;
 
-  return getUserInfo(user.id);
+  return `Welcome, ${username}`;
 }
 
 function signOut() {
-  if (currentUser == 0) {
+  if (currentUser == 'Guest') {
     throw new Error('Error: no user currently signed in');
   }
 
-  currentUser = 0;
+  currentUser = 'Guest';
 
   return 'User successfully signed out';
 }
 
-function getBooks() {
+function getBook(ISBN) {
   const query = print(
     gql`
-      query getBooks {
-        books {
+      query GetBook($ISBN: ID) {
+        book(ISBN: $ISBN) {
           ISBN
           title
         }
       }
     `
   );
-  return fetch('http://localhost:3000/database', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query })
-  })
-    .then(res => res.json())
-    .then(json => json.data.books);
+  const variables = { ISBN };
+  return fetchQuery({ query, variables }, 'book');
 }
 
 async function checkout(obj, { ISBN }, context, info) {
-  if (currentUser == 0) {
+  if (currentUser == 'Guest') {
     throw new Error('Error: no user currently signed in');
   }
-  if (checkedOut = getUser(currentUser).checkedOut.includes(ISBN)) {
+
+  const book = await getBook(ISBN);
+  if (!book) {
+    throw new Error(`Error: no book with ISBN ${ISBN} exists`);
+  }
+
+  const user = await getUser(currentUser);
+  const borrowed = user.checkedOut.find(function(b) {
+    return b.ISBN == book.ISBN;
+  });
+  if (borrowed) {
     throw new Error('Error: you have already checked out that book');
   }
 
-  books = await getBooks();
-  const book = books.find(function(book) {
-    return book.ISBN == ISBN;
-  });
+  const query = print(
+    gql`
+      mutation Checkout($username: String, $ISBN: ID) {
+        Checkout(username: $username, ISBN: $ISBN)
+      }
+    `
+  );
+  const variables = {
+    username: currentUser,
+    ISBN
+  };
+  const success = await fetchQuery({ query, variables }, 'Checkout');
 
-  if (book) {
-    getUser(currentUser).checkedOut.push(book.ISBN);
-    return `Checked out ${book.title}`;
-  } else {
-    throw new Error(`Error: no book with ISBN ${ISBN} exists`);
-  }
+  return success ? `Checked out ${book.title}` : 'Error: failed checkout';
 }
 
 const localTypes = new Schemata(
   gql`
     type Query {
-      user: UserInfo
+      user: User
     }
     type Mutation {
-      signUp(username: String, password: String): UserInfo,
-      signIn(username: String, password: String): UserInfo,
+      signUp(username: String, password: String): String,
+      signIn(username: String, password: String): String,
       signOut: String,
       checkout(ISBN: ID): String
     }
     type User {
-      id: ID,
-      username: String,
-      password: String,
-      checkedOut: [ID]
-    }
-    type UserInfo {
-      username: String,
-      checkedOut: [String]
+      checkedOut: [Book]
     }
     type Book {
       author: Author
@@ -176,7 +188,7 @@ const typeDefs = sharedTypes.mergeSDL(localTypes).typeDefs;
 
 const resolvers = {
   Query: {
-    user: () => getUserInfo(currentUser)
+    user: getUserInfo
   },
   Mutation: {
     signUp: signUp,
