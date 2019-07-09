@@ -172,21 +172,6 @@ const localTypes = new Schemata(
       signOut: String,
       checkout(ISBN: ID): String
     }
-    type User {
-      checkedOut: [Book]
-    }
-    type Book {
-      author: Author
-    }
-    type Author {
-      books: [Book]
-    }
-    type Movie {
-      director: Director
-    }
-    type Director {
-      movies: [Movie]
-    }
   `
 );
 

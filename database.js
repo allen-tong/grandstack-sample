@@ -6,21 +6,26 @@ const { makeAugmentedSchema } = require('neo4j-graphql-js');
 const sharedTypes = new Schemata(
   gql`
     type User {
-      username: String
+      username: String,
+      checkedOut: [Book]
     }
     type Book {
       ISBN: ID,
-      title: String
+      title: String,
+      author: Author
     }
     type Author {
-      name: String
+      name: String,
+      books: [Book]
     }
     type Movie {
       ISAN: ID,
-      title: String
+      title: String,
+      director: Director
     }
     type Director {
-      name: String
+      name: String,
+      movies: [Movie]
     }
   `
 );
@@ -35,10 +40,7 @@ const localTypes = new Schemata(
       book(ISBN: ID): Book
         @cypher(statement:
           "MATCH (book:Book {ISBN: $ISBN}) RETURN book"
-        ),
-      books: [Book],
-      authors: [Author],
-      movies: [Movie]
+        )
     }
     type Mutation {
       RelateAuthorToBook(authorName: String, bookISBN: ID, year: Int): Boolean
