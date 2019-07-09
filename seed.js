@@ -48,6 +48,12 @@ const query = print(
       ) {
         ...BookFragment
       }
+      b5: CreateBook(
+        ISBN: 5,
+        title: "Harry Potter and the Chamber of Secrets"
+      ) {
+        ...BookFragment
+      }
       a1: CreateAuthor(
         name: "J.K. Rowling"
       ) {
@@ -98,6 +104,11 @@ const query = print(
         authorName: "Arthur Conan Doyle",
         bookISBN: 4,
         year: 1902
+      )
+      br5: RelateAuthorToBook(
+        authorName: "J.K. Rowling"
+        bookISBN: 5,
+        year: 1998
       )
       mr1: RelateDirectorToMovie(
         directorName: "Rob Letterman",
