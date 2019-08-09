@@ -6,25 +6,25 @@ const { makeAugmentedSchema } = require('neo4j-graphql-js');
 const sharedTypes = new Schemata(
   gql`
     type User {
-      username: String,
+      username: String
       checkedOut: [Book]
     }
     type Book {
-      ISBN: ID,
-      title: String,
+      ISBN: ID
+      title: String
       author: Author
     }
     type Author {
-      name: String,
+      name: String
       books: [Book]
     }
     type Movie {
-      ISAN: ID,
-      title: String,
+      ISAN: ID
+      title: String
       director: Director
     }
     type Director {
-      name: String,
+      name: String
       movies: [Movie]
     }
   `
@@ -36,7 +36,7 @@ const localTypes = new Schemata(
       user(username: String): User
         @cypher(statement:
           "MATCH (user:User {username: $username}) RETURN user"
-        ),
+        )
       book(ISBN: ID): Book
         @cypher(statement:
           "MATCH (book:Book {ISBN: $ISBN}) RETURN book"
@@ -51,7 +51,7 @@ const localTypes = new Schemata(
           MERGE (author)-[rel:WROTE {year: $year}]->(book)
           RETURN exists(()-[rel]->())
           """
-        ),
+        )
       RelateDirectorToMovie(directorName: String, movieISAN: ID): Boolean
         @cypher(statement:
           """
@@ -60,7 +60,7 @@ const localTypes = new Schemata(
           MERGE (director)-[rel:DIRECTED]->(movie)
           RETURN exists(()-[rel]->())
           """
-        ),
+        )
       Checkout(username: String, ISBN: ID): Boolean
         @cypher(statement:
           """
@@ -70,9 +70,19 @@ const localTypes = new Schemata(
           RETURN exists(()-[rel]->())
           """
         )
+      Return(username: String, ISBN: ID): Boolean
+        @cypher(statement:
+          """
+          MATCH (user:User {username: $username})
+          MATCH (book:Book {ISBN: $ISBN})
+          MATCH (user)-[rel:BORROWING]->(book)
+          DELETE rel
+          RETURN true
+          """
+        )
     }
     type User {
-      password: String,
+      password: String
       checkedOut: [Book]
         @relation(name: "BORROWING", direction: "OUT")
         @cypher(statement: "MATCH (this)-[:BORROWING]->(b:Book) RETURN b")

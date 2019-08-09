@@ -15,7 +15,13 @@ function fetchQuery(queryObj, queryName) {
     body: JSON.stringify(queryObj)
   })
     .then(res => res.json())
-    .then(json => json.data[queryName]);
+    .then(json => {
+      if (!json) {
+        throw new Error('GraphQL Error');
+      }
+      return json.data[queryName];
+    })
+    .catch(console.log);
 }
 
 function getUser(username) {
@@ -161,16 +167,51 @@ async function checkout(obj, { ISBN }, context, info) {
   return success ? `Checked out ${book.title}` : 'Error: failed checkout';
 }
 
+async function Return(obj, { ISBN }, context, info) {
+  if (currentUser == 'Guest') {
+    throw new Error('Error: no user currently signed in');
+  }
+
+  const book = await getBook(ISBN);
+  if (!book) {
+    throw new Error(`Error: no book with ISBN ${ISBN} exists`);
+  }
+
+  const user = await getUser(currentUser);
+  const borrowed = user.checkedOut.find(function(b) {
+    return b.ISBN == book.ISBN;
+  });
+  if (!borrowed) {
+    throw new Error('Error: you have not checked out that book');
+  }
+
+  const query = print(
+    gql`
+      mutation Return($username: String, $ISBN: ID) {
+        Return(username: $username, ISBN: $ISBN)
+      }
+    `
+  );
+  const variables = {
+    username: currentUser,
+    ISBN
+  };
+  const success = await fetchQuery({ query, variables }, 'Return');
+
+  return success ? `Returned ${book.title}` : 'Error: failed return';
+}
+
 const localTypes = new Schemata(
   gql`
     type Query {
       user: User
     }
     type Mutation {
-      signUp(username: String, password: String): String,
-      signIn(username: String, password: String): String,
-      signOut: String,
+      signUp(username: String, password: String): String
+      signIn(username: String, password: String): String
+      signOut: String
       checkout(ISBN: ID): String
+      return(ISBN: ID): String
     }
   `
 );
@@ -185,7 +226,8 @@ const resolvers = {
     signUp: signUp,
     signIn: signIn,
     signOut: signOut,
-    checkout: checkout
+    checkout: checkout,
+    return: Return
   }
 };
 
